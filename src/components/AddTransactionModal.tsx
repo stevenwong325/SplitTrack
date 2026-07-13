@@ -153,7 +153,6 @@ export default function AddTransactionModal({
 
   // Validators
   const isValid = useMemo(() => {
-    if (!description.trim()) return false;
     if (amount <= 0) return false;
     if (rate <= 0) return false;
 
@@ -165,7 +164,7 @@ export default function AddTransactionModal({
       }
     }
     return true;
-  }, [description, amount, rate, type, isPersonal, selectedSplitters, splitMode, customSplitsSum]);
+  }, [amount, rate, type, isPersonal, selectedSplitters, splitMode, customSplitsSum]);
 
   const toggleSplitter = (id: string) => {
     setSelectedSplitters(prev => {
@@ -203,11 +202,22 @@ export default function AddTransactionModal({
     const rem = amount - currentSum;
     if (rem <= 0) return;
 
-    const n = selectedSplitters.length;
+    // Filter selected splitters whose custom amount is 0
+    let targetSplitters = selectedSplitters.filter(id => {
+      const val = parseFloat(customAmounts[id]) || 0;
+      return val === 0;
+    });
+
+    // If no selected splitters have custom amount == 0, fallback to all selected splitters
+    if (targetSplitters.length === 0) {
+      targetSplitters = selectedSplitters;
+    }
+
+    const n = targetSplitters.length;
     const share = Number((rem / n).toFixed(2));
     
     const nextCustoms = { ...customAmounts };
-    selectedSplitters.forEach((id, idx) => {
+    targetSplitters.forEach((id, idx) => {
       const currentVal = parseFloat(nextCustoms[id]) || 0;
       // Add share, handle last person remainder
       const valToAdd = idx === n - 1 ? Number((rem - share * (n - 1)).toFixed(2)) : share;
@@ -237,7 +247,7 @@ export default function AddTransactionModal({
     }
 
     const transactionData = {
-      description: description.trim(),
+      description: description.trim() || category,
       amount,
       currency: currencyCode,
       rate,
@@ -316,7 +326,6 @@ export default function AddTransactionModal({
             </label>
             <input
               type="text"
-              required
               placeholder="e.g. Sushi Dinner, Taxi, Salary"
               value={description}
               onChange={e => setDescription(e.target.value)}
