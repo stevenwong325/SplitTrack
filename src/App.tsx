@@ -32,6 +32,8 @@ export default function App() {
     updateTransaction,
     updateCurrencyRate,
     setBaseCurrency,
+    addCurrency,
+    removeCurrency,
     clearAllData,
     loadDemoData,
     importData,
@@ -219,6 +221,8 @@ export default function App() {
               onUpdateParticipant={updateParticipant}
               onUpdateCurrencyRate={updateCurrencyRate}
               onSetBaseCurrency={setBaseCurrency}
+              onAddCurrency={addCurrency}
+              onRemoveCurrency={removeCurrency}
               onSelectCurrentUser={setCurrentUserId}
               onClearAllData={clearAllData}
               onLoadDemoData={loadDemoData}

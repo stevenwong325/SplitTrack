@@ -188,6 +188,59 @@ export function useAppState() {
     });
   };
 
+  const addCurrency = (code: string, symbol: string, rate?: number): boolean => {
+    const formattedCode = code.trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(formattedCode)) {
+      alert('Invalid currency code. It must be exactly 3 uppercase letters (ISO 4217).');
+      return false;
+    }
+
+    const isDuplicate = state.currencies.some(c => c.code.toUpperCase() === formattedCode);
+    if (isDuplicate) {
+      alert(`Currency code "${formattedCode}" already exists.`);
+      return false;
+    }
+
+    let finalRate = rate;
+    if (finalRate === undefined || finalRate <= 0) {
+      finalRate = 1.0;
+      alert('Initial rate is not provided or invalid. Set to 1.0 by default. You can adjust it below.');
+    }
+
+    const newCurrency: Currency = {
+      code: formattedCode,
+      symbol: symbol.trim() || '$',
+      rate: finalRate,
+      isBase: false,
+    };
+
+    setState(prev => ({
+      ...prev,
+      currencies: [...prev.currencies, newCurrency],
+    }));
+    return true;
+  };
+
+  const removeCurrency = (code: string): boolean => {
+    const formattedCode = code.trim().toUpperCase();
+    if (formattedCode === state.baseCurrencyCode.toUpperCase()) {
+      alert('Cannot delete the active base currency.');
+      return false;
+    }
+
+    const hasTransaction = state.transactions.some(t => t.currency.toUpperCase() === formattedCode);
+    if (hasTransaction) {
+      alert(`Cannot delete currency "${formattedCode}" because it is referenced in one or more transactions. Please delete or modify those transactions first.`);
+      return false;
+    }
+
+    setState(prev => ({
+      ...prev,
+      currencies: prev.currencies.filter(c => c.code.toUpperCase() !== formattedCode),
+    }));
+    return true;
+  };
+
   const clearAllData = () => {
     if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
       setState(INITIAL_STATE);
@@ -351,6 +404,8 @@ export function useAppState() {
     updateTransaction,
     updateCurrencyRate,
     setBaseCurrency,
+    addCurrency,
+    removeCurrency,
     clearAllData,
     loadDemoData,
     importData,

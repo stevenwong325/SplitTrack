@@ -12,6 +12,7 @@ import {
   CheckCircle2 
 } from 'lucide-react';
 import type { Participant, Currency, AppState } from '../types';
+import { getAvailablePresets, INITIAL_RATES_TO_HKD } from '../constants/currencies';
 
 interface SettingsTabProps {
   participants: Participant[];
@@ -23,6 +24,8 @@ interface SettingsTabProps {
   onUpdateParticipant: (id: string, name: string) => void;
   onUpdateCurrencyRate: (code: string, rate: number) => void;
   onSetBaseCurrency: (code: string) => void;
+  onAddCurrency: (code: string, symbol: string, rate?: number) => boolean;
+  onRemoveCurrency: (code: string) => boolean;
   onSelectCurrentUser: (id: string) => void;
   onClearAllData: () => void;
   onLoadDemoData: () => void;
@@ -40,6 +43,8 @@ export default function SettingsTab({
   onUpdateParticipant,
   onUpdateCurrencyRate,
   onSetBaseCurrency,
+  onAddCurrency,
+  onRemoveCurrency,
   onSelectCurrentUser,
   onClearAllData,
   onLoadDemoData,
@@ -49,6 +54,12 @@ export default function SettingsTab({
   const [newParticipantName, setNewParticipantName] = useState('');
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+
+  // States for currency additions
+  const [selectedPresetCode, setSelectedPresetCode] = useState('');
+  const [customCode, setCustomCode] = useState('');
+  const [customSymbol, setCustomSymbol] = useState('');
+  const [customRate, setCustomRate] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -284,21 +295,162 @@ export default function SettingsTab({
               </select>
             </div>
 
+            {/* Quick Add Presets */}
+            <div className="space-y-2.5 pt-1.5 border-b border-dashed border-slate-100 pb-3">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Add Common Currency</span>
+              {(() => {
+                const availablePresets = getAvailablePresets(currencies.map(c => c.code));
+                return availablePresets.length > 0 ? (
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedPresetCode}
+                      onChange={e => setSelectedPresetCode(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="">Select a currency...</option>
+                      {availablePresets.map(p => (
+                        <option key={p.code} value={p.code}>
+                          {p.code} ({p.symbol})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPresetCode) {
+                          const preset = availablePresets.find(p => p.code === selectedPresetCode);
+                          if (preset) {
+                            // Convert suggestedRate (relative to HKD) to be relative to the current Base Currency
+                            const hkdCurrency = currencies.find(c => c.code === 'HKD');
+                            const rateOfHKD = hkdCurrency 
+                              ? hkdCurrency.rate 
+                              : (1.0 / (INITIAL_RATES_TO_HKD[baseCurrencyCode] || 1.0));
+
+                            const convertedRate = Number((preset.suggestedRate * rateOfHKD).toFixed(6));
+
+                            const success = onAddCurrency(preset.code, preset.symbol, convertedRate);
+                            if (success) {
+                              setSelectedPresetCode('');
+                            }
+                          }
+                        }
+                      }}
+                      disabled={!selectedPresetCode}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer disabled:cursor-not-allowed disabled:shadow-none shrink-0"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-400 italic">All predefined currencies have been added.</p>
+                );
+              })()}
+            </div>
+
+            {/* Custom Currency Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const codeUpper = customCode.trim().toUpperCase();
+                if (!/^[A-Z]{3}$/.test(codeUpper)) {
+                  alert('Currency code must be exactly 3 uppercase letters (ISO 4217).');
+                  return;
+                }
+                const isDup = currencies.some(c => c.code.toUpperCase() === codeUpper);
+                if (isDup) {
+                  alert(`Currency "${codeUpper}" already exists.`);
+                  return;
+                }
+                const symb = customSymbol.trim();
+                if (!symb) {
+                  alert('Currency symbol is required.');
+                  return;
+                }
+                const rateFloat = parseFloat(customRate) || 1.0;
+                if (rateFloat <= 0) {
+                  alert('Rate must be greater than 0.');
+                  return;
+                }
+                const success = onAddCurrency(codeUpper, symb, rateFloat);
+                if (success) {
+                  setCustomCode('');
+                  setCustomSymbol('');
+                  setCustomRate('');
+                }
+              }}
+              className="space-y-2.5 pt-1.5 border-b border-dashed border-slate-100 pb-3"
+            >
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Add Custom Currency</span>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Code (CAD)"
+                    value={customCode}
+                    onChange={e => setCustomCode(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-xs transition-all uppercase"
+                    maxLength={3}
+                    required
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Symbol ($)"
+                    value={customSymbol}
+                    onChange={e => setCustomSymbol(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-xs transition-all"
+                    required
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder={`Rate (vs ${baseCurrencyCode})`}
+                    value={customRate}
+                    onChange={e => {
+                      if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
+                        setCustomRate(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-xs transition-all"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={!customCode.trim() || !customSymbol.trim() || !customRate.trim()}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/10 cursor-pointer disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  Add Custom Currency
+                </button>
+              </div>
+            </form>
+
             {/* Exchange Rates Inputs */}
             <div className="space-y-3 pt-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Custom exchange rates</span>
               <p className="text-[10px] text-slate-400">Define how much <strong>1 unit of foreign currency</strong> is worth in your Base Currency ({baseCurrencyCode}).</p>
 
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {currencies.map(c => {
                   const isBase = c.code === baseCurrencyCode;
                   return (
-                    <div key={c.code} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                      <span className="text-sm font-bold text-slate-600">
-                        1 {c.code} ({c.symbol})
-                      </span>
+                    <div key={c.code} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-sm font-bold text-slate-600">
+                          1 {c.code} ({c.symbol})
+                        </span>
+                        {isBase && (
+                          <span className="inline-flex items-center text-[8px] font-bold text-indigo-600 bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded uppercase shrink-0">
+                            Base
+                          </span>
+                        )}
+                      </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400 font-bold">=</span>
                         <div className="relative">
                           <input
@@ -309,16 +461,34 @@ export default function SettingsTab({
                               const rate = parseFloat(e.target.value) || 0;
                               onUpdateCurrencyRate(c.code, rate);
                             }}
-                            className={`w-28 px-3 py-1 text-sm border rounded-lg text-right font-semibold focus:outline-none ${
+                            className={`w-24 px-2.5 py-1 text-sm border rounded-lg text-right font-semibold focus:outline-none ${
                               isBase
                                 ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
                                 : 'border-slate-300 bg-white text-slate-700 focus:ring-1 focus:ring-indigo-500'
                             }`}
                           />
                         </div>
-                        <span className="text-xs font-bold text-slate-500 w-10">
+                        <span className="text-xs font-bold text-slate-500 w-8 truncate">
                           {baseCurrencyCode}
                         </span>
+
+                        {/* Delete Button */}
+                        {!isBase ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete the currency "${c.code}"?`)) {
+                                onRemoveCurrency(c.code);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Currency"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <div className="w-5.5" />
+                        )}
                       </div>
                     </div>
                   );
