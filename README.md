@@ -15,16 +15,16 @@ When adding an expense, easily toggle between:
 
 ### 2. Advanced Bill Splitting Modes
 *   **⚖️ Equally Split:** Auto-calculates shares and elegantly handles decimal division remainders down to the penny by assigning fractional cents to the last member.
-*   **✏️ Custom Split:** Specify precise amounts for each participant. Includes live sum validation alerts and an "Auto Fill" remainder button for speedy entries.
+*   **✏️ Custom Split:** Specify precise amounts for each participant. Includes live sum validation alerts and a smart **"Auto Fill" Remainder** helper. This helper intelligently distributes any remaining amount evenly among selected splitters whose current split is `0` (or falls back to distributing among everyone if none are `0`), making complex splits effortless.
 
 ### 3. Debt Simplification Algorithm
 Includes an optimized greedy ledger settlement matching algorithm ($O(N \log N)$ complexity). It simplifies net balances across the group, calculating "who owes whom" in the minimum possible transactions.
 *   **Paid & Settle:** Click "Paid & Settle" to automatically log a neutralizing transaction that instantly resolves debts in the ledger!
 
-### 4. Multi-Currency Engine
-*   Standard base currency defaults to **HKD**, with presets for **JPY**, **CNY**, and **TWD**.
-*   Custom exchange rates can be edited dynamically in Settings.
-*   Changing your base currency automatically updates all statistics and historical transaction logs.
+### 4. Multi-Currency Engine & Custom Presets
+*   **Dynamic Currency Manager:** Easily add custom currencies or load popular presets (including `USD`, `EUR`, `GBP`, `SGD`, `AUD`, `KRW`, `JPY`, `CNY`, and `TWD`) directly in the Settings tab.
+*   **Safety Guards:** Prevents deleting the active Base Currency or any currency currently referenced by transactions to keep your ledger pristine.
+*   **Flexible Exchange Rates:** Edit exchange rates dynamically. Changing the Base Currency automatically updates all statistics, converting historical records accurately.
 
 ### 5. Beautiful Monthly Dashboard & Ledger
 *   **Monthly Overview:** Real-time summary cards for Total Income, Total Expenses, Net Balance, and Group Settlement outstanding levels.
