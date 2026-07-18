@@ -16,6 +16,16 @@ interface AddTransactionModalProps {
 
 const CATEGORIES: Category[] = ['Food', 'Transport', 'Lodging', 'Entertainment', 'Shopping', 'Others'];
 
+const CATEGORY_EMOJIS: Record<Category, string> = {
+  Food: '🍔',
+  Transport: '🚗',
+  Lodging: '🏨',
+  Entertainment: '🎬',
+  Shopping: '🛍️',
+  Others: '❓',
+  Income: '💰',
+};
+
 export default function AddTransactionModal({
   isOpen,
   onClose,
@@ -433,7 +443,7 @@ export default function AddTransactionModal({
                 >
                   {CATEGORIES.map(cat => (
                     <option key={cat} value={cat}>
-                      {cat}
+                      {CATEGORY_EMOJIS[cat] || '❓'} {cat}
                     </option>
                   ))}
                 </select>
