@@ -345,6 +345,7 @@ export default function AddTransactionModal({
                 </span>
                 <input
                   type="text"
+                  inputMode="decimal"
                   required
                   placeholder="0.00"
                   value={amountStr}
@@ -386,6 +387,7 @@ export default function AddTransactionModal({
                   <span>1 {currencyCode} =</span>
                   <input
                     type="text"
+                    inputMode="decimal"
                     value={rateStr}
                     onChange={e => {
                       if (e.target.value === '' || /^\d*\.?\d*$/.test(e.target.value)) {
