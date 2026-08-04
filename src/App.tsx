@@ -42,7 +42,27 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'settlements' | 'settings'>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  // Dynamic default month: newest transaction month or 'all' if empty
+  const latestTxMonth = useMemo(() => {
+    if (transactions && transactions.length > 0) {
+      const dates = transactions.map(t => t.date).filter(Boolean);
+      if (dates.length > 0) {
+        return dates.sort((a, b) => b.localeCompare(a))[0].substring(0, 7);
+      }
+    }
+    // return new Date().toISOString().substring(0, 7);
+    return 'all';
+  }, [transactions]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(latestTxMonth);
+  const [prevLatestTxMonth, setPrevLatestTxMonth] = useState<string>(latestTxMonth);
+
+  // Keep selectedMonth in sync during rendering when the latest transaction month shifts (e.g. on add, delete, import, or clear)
+  if (latestTxMonth !== prevLatestTxMonth) {
+    setPrevLatestTxMonth(latestTxMonth);
+    setSelectedMonth(latestTxMonth);
+  }
 
   // Compute simplified net debts from group transactions
   const simplifiedDebts = useMemo(() => {

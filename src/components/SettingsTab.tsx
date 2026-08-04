@@ -406,6 +406,7 @@ export default function SettingsTab({
                 <div>
                   <input
                     type="text"
+                    inputMode="decimal"
                     placeholder={`Rate (vs ${baseCurrencyCode})`}
                     value={customRate}
                     onChange={e => {
@@ -455,6 +456,7 @@ export default function SettingsTab({
                         <div className="relative">
                           <input
                             type="text"
+                            inputMode="decimal"
                             disabled={isBase}
                             value={c.rate}
                             onChange={e => {

@@ -592,6 +592,7 @@ export default function AddTransactionModal({
                                 </span>
                                 <input
                                   type="text"
+                                  inputMode="decimal"
                                   placeholder="0.00"
                                   value={customAmounts[p.id] || ''}
                                   onChange={e => handleCustomAmountChange(p.id, e.target.value)}
