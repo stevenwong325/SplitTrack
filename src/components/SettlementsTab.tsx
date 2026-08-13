@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Users, ArrowRight, Share2 } from 'lucide-react';
 import type { Debt, Participant, Transaction } from '../types';
-import { generateSettlementText } from '../utils/finance';
+import { generateSettlementText, getSettlementParties } from '../utils/finance';
 
 interface SettlementsTabProps {
   participants: Participant[];
@@ -24,36 +24,66 @@ export default function SettlementsTab({
     return participants.find(p => p.id === id)?.name || 'Unknown';
   };
 
-  // Calculate each participant's individual group balance sheet (Paid vs Owed)
+  // Calculate each participant's bill position and recorded repayments.
   const individualBalances = useMemo(() => {
-    const balances: { [id: string]: { paid: number; owed: number; net: number } } = {};
+    const balances: {
+      [id: string]: {
+        billsPaid: number;
+        owed: number;
+        settlementsSent: number;
+        settlementsReceived: number;
+        net: number;
+      };
+    } = {};
     
     participants.forEach(p => {
-      balances[p.id] = { paid: 0, owed: 0, net: 0 };
+      balances[p.id] = {
+        billsPaid: 0,
+        owed: 0,
+        settlementsSent: 0,
+        settlementsReceived: 0,
+        net: 0,
+      };
     });
 
     transactions.forEach(t => {
-      if (t.type !== 'expense' || t.isPersonal) return;
-
       const totalInBase = t.amount * t.rate;
-      
-      // Paid
-      if (balances[t.paidBy]) {
-        balances[t.paidBy].paid += totalInBase;
+
+      if (t.type === 'expense' && !t.isPersonal) {
+        if (balances[t.paidBy]) {
+          balances[t.paidBy].billsPaid += totalInBase;
+        }
+
+        t.splits.forEach(s => {
+          const shareInBase = s.amount * t.rate;
+          if (balances[s.participantId]) {
+            balances[s.participantId].owed += shareInBase;
+          }
+        });
+        return;
       }
 
-      // Owed share
-      t.splits.forEach(s => {
-        const shareInBase = s.amount * t.rate;
-        if (balances[s.participantId]) {
-          balances[s.participantId].owed += shareInBase;
+      if (t.type === 'settlement') {
+        const parties = getSettlementParties(t);
+        if (!parties) return;
+
+        if (balances[parties.from]) {
+          balances[parties.from].settlementsSent += totalInBase;
         }
-      });
+        if (balances[parties.to]) {
+          balances[parties.to].settlementsReceived += totalInBase;
+        }
+      }
     });
 
     // Compute net
     Object.keys(balances).forEach(id => {
-      balances[id].net = balances[id].paid - balances[id].owed;
+      const balance = balances[id];
+      balance.net =
+        balance.billsPaid -
+        balance.owed +
+        balance.settlementsSent -
+        balance.settlementsReceived;
     });
 
     return balances;
@@ -109,16 +139,30 @@ export default function SettlementsTab({
 
             <div className="divide-y divide-slate-100">
               {participants.map(p => {
-                const b = individualBalances[p.id] || { paid: 0, owed: 0, net: 0 };
+                const b = individualBalances[p.id] || {
+                  billsPaid: 0,
+                  owed: 0,
+                  settlementsSent: 0,
+                  settlementsReceived: 0,
+                  net: 0,
+                };
+                const hasSettlements = b.settlementsSent > 0 || b.settlementsReceived > 0;
                 return (
                   <div key={p.id} className="py-4 flex items-center justify-between gap-4 group">
                     <div className="space-y-0.5">
                       <div className="font-bold text-slate-700">{p.name}</div>
                       <div className="text-xs text-slate-400 font-semibold flex items-center gap-3">
-                        <span>Paid: {baseCurrencySymbol}{b.paid.toFixed(2)}</span>
+                        <span>Bills paid: {baseCurrencySymbol}{b.billsPaid.toFixed(2)}</span>
                         <span>•</span>
                         <span>Owed share: {baseCurrencySymbol}{b.owed.toFixed(2)}</span>
                       </div>
+                      {hasSettlements && (
+                        <div className="text-[11px] text-indigo-500 font-semibold flex items-center gap-3">
+                          <span>Repayments sent: {baseCurrencySymbol}{b.settlementsSent.toFixed(2)}</span>
+                          <span>•</span>
+                          <span>Received: {baseCurrencySymbol}{b.settlementsReceived.toFixed(2)}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-right">

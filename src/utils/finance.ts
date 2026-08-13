@@ -1,8 +1,23 @@
 import type { Transaction, Participant, Debt, Category } from '../types';
 
+export interface SettlementParties {
+  from: string;
+  to: string;
+}
+
+export function getSettlementParties(transaction: Transaction): SettlementParties | null {
+  if (transaction.type !== 'settlement') return null;
+
+  const from = transaction.settlementFrom || transaction.paidBy;
+  const to = transaction.settlementTo || transaction.splits[0]?.participantId;
+
+  if (!from || !to || from === to) return null;
+  return { from, to };
+}
+
 /**
  * Calculates the simplified debts (who owes whom) from a list of transactions.
- * Returns only the transactions that are group-split expenses.
+ * Group expenses create debts; settlement payments reduce them.
  */
 export function calculateSettlements(
   transactions: Transaction[],
@@ -16,23 +31,36 @@ export function calculateSettlements(
 
   // 2. Accumulate net balances from transactions
   transactions.forEach(t => {
-    if (t.type !== 'expense' || t.isPersonal) return;
-
-    // Convert total and shares to Base Currency using transaction-specific rate
     const totalInBase = t.amount * t.rate;
-    
-    // Add paid amount to the payer's credit
-    if (balances[t.paidBy] !== undefined) {
-      balances[t.paidBy] += totalInBase;
+
+    if (t.type === 'expense' && !t.isPersonal) {
+      // Paying a group bill creates credit for the payer.
+      if (balances[t.paidBy] !== undefined) {
+        balances[t.paidBy] += totalInBase;
+      }
+
+      // Each participant's share creates debt for that participant.
+      t.splits.forEach(share => {
+        const shareInBase = share.amount * t.rate;
+        if (balances[share.participantId] !== undefined) {
+          balances[share.participantId] -= shareInBase;
+        }
+      });
+      return;
     }
 
-    // Subtract each participant's share from their balance
-    t.splits.forEach(share => {
-      const shareInBase = share.amount * t.rate;
-      if (balances[share.participantId] !== undefined) {
-        balances[share.participantId] -= shareInBase;
+    if (t.type === 'settlement') {
+      const parties = getSettlementParties(t);
+      if (!parties) return;
+
+      // A repayment reduces the sender's debt and the recipient's credit.
+      if (balances[parties.from] !== undefined) {
+        balances[parties.from] += totalInBase;
       }
-    });
+      if (balances[parties.to] !== undefined) {
+        balances[parties.to] -= totalInBase;
+      }
+    }
   });
 
   // 3. Separate into debtors (balance < -0.01) and creditors (balance > 0.01)
@@ -126,7 +154,7 @@ export function calculateUserStats(
       // Income is considered 100% personal
       totalIncome += amountInBase;
       categoryBreakdown['Income'] = (categoryBreakdown['Income'] || 0) + amountInBase;
-    } else {
+    } else if (t.type === 'expense') {
       // Expense
       if (t.isPersonal) {
         // Personal expense

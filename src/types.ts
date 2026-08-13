@@ -19,7 +19,7 @@ export type Category =
   | 'Shopping' 
   | 'Others';
 
-export type TransactionType = 'expense' | 'income';
+export type TransactionType = 'expense' | 'income' | 'settlement';
 export type SplitMode = 'equally' | 'custom';
 
 export interface SplitShare {
@@ -40,6 +40,8 @@ export interface Transaction {
   isPersonal: boolean; // true = personal, false = group split
   splitMode: SplitMode;
   splits: SplitShare[]; // Array of shares
+  settlementFrom?: string; // Participant ID who sends a settlement payment
+  settlementTo?: string; // Participant ID who receives a settlement payment
 }
 
 export interface Debt {

@@ -14,6 +14,7 @@ import TransactionsTab from './components/TransactionsTab';
 import SettlementsTab from './components/SettlementsTab';
 import SettingsTab from './components/SettingsTab';
 import AddTransactionModal from './components/AddTransactionModal';
+import type { Transaction } from './types';
 
 export default function App() {
   const {
@@ -41,7 +42,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'settlements' | 'settings'>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Dynamic default month: newest transaction month or 'all' if empty
   const latestTxMonth = useMemo(() => {
@@ -81,17 +82,19 @@ export default function App() {
       rate: 1.0,
       date: new Date().toISOString().split('T')[0], // Today
       category: 'Others',
-      type: 'expense',
-      paidBy: fromId, // Payer (debtor) is credited
+      type: 'settlement',
+      paidBy: fromId,
       isPersonal: false,
       splitMode: 'custom',
       splits: [
-        { participantId: toId, amount }, // Recipient (creditor) is allocated the debit, neutralizing both
+        { participantId: toId, amount },
       ],
+      settlementFrom: fromId,
+      settlementTo: toId,
     });
   };
 
-  const handleEditClick = (t: any) => {
+  const handleEditClick = (t: Transaction) => {
     setEditingTransaction(t);
     setIsAddModalOpen(true);
   };
@@ -213,6 +216,7 @@ export default function App() {
               participants={participants}
               currencies={currencies}
               currentUserId={currentUserId}
+              baseCurrencyCode={baseCurrencyCode}
               baseCurrencySymbol={baseCurrency.symbol}
               onAddClick={handleAddClick}
               onEditClick={handleEditClick}

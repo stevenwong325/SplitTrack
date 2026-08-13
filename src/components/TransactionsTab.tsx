@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, Trash2, Edit3, Users, User, ArrowUp } from 'lucide-react';
+import { Search, Plus, Trash2, Edit3, Users, User, ArrowUp, ArrowRight } from 'lucide-react';
 import type { Transaction, Participant, Currency } from '../types';
 import { CATEGORY_CONFIG } from './DashboardTab';
+import { getSettlementParties } from '../utils/finance';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
   participants: Participant[];
   currencies: Currency[];
   currentUserId: string;
+  baseCurrencyCode: string;
   baseCurrencySymbol: string;
   onAddClick: () => void;
   onEditClick: (transaction: Transaction) => void;
@@ -19,6 +21,7 @@ export default function TransactionsTab({
   participants,
   currencies,
   currentUserId,
+  baseCurrencyCode,
   baseCurrencySymbol,
   onAddClick,
   onEditClick,
@@ -47,10 +50,11 @@ export default function TransactionsTab({
       // Category dropdown filter
       const categoryMatch = categoryFilter === 'all' || t.category === categoryFilter;
 
-      // Type dropdown filter (expense, income, personal, split)
+      // Type dropdown filter (expense, income, settlement, personal, split)
       let typeMatch = true;
       if (typeFilter === 'expense') typeMatch = t.type === 'expense';
       else if (typeFilter === 'income') typeMatch = t.type === 'income';
+      else if (typeFilter === 'settlement') typeMatch = t.type === 'settlement';
       else if (typeFilter === 'personal') typeMatch = t.type === 'expense' && t.isPersonal;
       else if (typeFilter === 'split') typeMatch = t.type === 'expense' && !t.isPersonal;
 
@@ -142,6 +146,7 @@ export default function TransactionsTab({
             <option value="all">🔄 All Types</option>
             <option value="expense">💸 Expenses Only</option>
             <option value="income">💰 Incomes Only</option>
+            <option value="settlement">🤝 Settlements</option>
             <option value="personal">👤 Personal Expenses</option>
             <option value="split">👥 Group Splits</option>
           </select>
@@ -190,7 +195,14 @@ export default function TransactionsTab({
                   const config = CATEGORY_CONFIG[t.category] || CATEGORY_CONFIG['Others'];
                   const Icon = config.icon;
                   const isIncome = t.type === 'income';
+                  const isSettlement = t.type === 'settlement';
+                  const settlementParties = getSettlementParties(t);
                   const symbol = getCurrencySymbol(t.currency);
+                  const settlementSign = settlementParties?.to === currentUserId
+                    ? '+'
+                    : settlementParties?.from === currentUserId
+                      ? '-'
+                      : '';
 
                   return (
                     <div
@@ -223,7 +235,14 @@ export default function TransactionsTab({
                           
                           {/* Split/Personal Tag */}
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {isIncome ? (
+                            {isSettlement && settlementParties ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                🤝 Settlement
+                                <span className="text-slate-400 font-medium">
+                                  ({getParticipantName(settlementParties.from)} <ArrowRight className="inline w-3 h-3" /> {getParticipantName(settlementParties.to)})
+                                </span>
+                              </span>
+                            ) : isIncome ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                                 <ArrowUp className="w-3 h-3" /> Income
                               </span>
@@ -249,13 +268,19 @@ export default function TransactionsTab({
                         {/* Amounts block */}
                         <div className="text-right space-y-0.5">
                           {/* Main Amount (In Original Currency) */}
-                          <div className={`font-bold text-sm sm:text-base ${isIncome ? 'text-emerald-600' : 'text-slate-800'}`}>
-                            {isIncome ? '+' : '-'}{symbol}
+                          <div className={`font-bold text-sm sm:text-base ${
+                            isSettlement
+                              ? 'text-indigo-600'
+                              : isIncome
+                                ? 'text-emerald-600'
+                                : 'text-slate-800'
+                          }`}>
+                            {isSettlement ? settlementSign : isIncome ? '+' : '-'}{symbol}
                             {t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
 
                           {/* Secondary Amount (In Base Currency if different) */}
-                          {t.currency !== baseCurrencySymbol && (
+                          {t.currency !== baseCurrencyCode && (
                             <div className="text-[11px] text-slate-400 font-semibold">
                               ≈ {baseCurrencySymbol}
                               {(t.amount * t.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -265,13 +290,15 @@ export default function TransactionsTab({
 
                         {/* Edit & Delete Action Panel */}
                         <div className="flex items-center gap-1 sm:opacity-0 group-hover:opacity-100 transition-all">
-                          <button
-                            onClick={() => onEditClick(t)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                            title="Edit"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
+                          {!isSettlement && (
+                            <button
+                              onClick={() => onEditClick(t)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                              title="Edit"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               if (confirm('Delete this transaction?')) {

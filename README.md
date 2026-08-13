@@ -42,7 +42,7 @@ Includes an optimized greedy ledger settlement matching algorithm ($O(N \log N)$
 To run and edit this project locally on your machine, follow these steps:
 
 ### Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) installed (version 18+ recommended) along with `npm`.
+Make sure you have [Node.js](https://nodejs.org/) installed (version 20+ recommended) along with `npm`.
 
 ### 1. Clone the repository
 Navigate to your project directory:
@@ -69,6 +69,12 @@ To build optimized, minified static assets:
 npm run build
 ```
 This will compile all code into the **`dist/`** directory. You can preview the production bundle locally with `npm run preview`.
+
+### 5. Run tests
+Run the settlement and finance regression tests with:
+```bash
+npm test
+```
 
 ---
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Participant, Currency, Transaction, AppState } from '../types';
+import { migrateAppState } from '../utils/migrations';
 
 const STORAGE_KEY = 'splittrack_state';
 const CURRENT_USER_KEY = 'splittrack_current_user_id';
@@ -32,7 +33,7 @@ export function useAppState() {
         const parsed = JSON.parse(saved);
         // Ensure standard structure is valid
         if (parsed.participants && parsed.currencies && parsed.transactions) {
-          return parsed;
+          return migrateAppState(parsed);
         }
       }
     } catch (e) {
@@ -374,7 +375,7 @@ export function useAppState() {
 
   const importData = (imported: AppState) => {
     if (imported.participants && imported.currencies && imported.transactions && imported.baseCurrencyCode) {
-      setState(imported);
+      setState(migrateAppState(imported));
       if (imported.participants.length > 0) {
         setCurrentUserId(imported.participants[0].id);
       }
