@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -11,7 +11,8 @@ import {
   Film, 
   ShoppingBag, 
   HelpCircle, 
-  DollarSign 
+  DollarSign,
+  ChevronDown
 } from 'lucide-react';
 import type { Transaction, Participant, Debt, Category } from '../types';
 import { calculateUserStats } from '../utils/finance';
@@ -94,6 +95,36 @@ export default function DashboardTab({
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [stats.categoryBreakdown, totalExpenseSum]);
+
+  // Currently expanded category in the breakdown accordion (null = all collapsed)
+  const [expandedCategory, setExpandedCategory] = useState<Category | null>(null);
+
+  const toggleCategory = (category: Category) => {
+    setExpandedCategory(prev => (prev === category ? null : category));
+  };
+
+  // Individual expense transactions (user's personal expenses or split shares)
+  // attributed to the expanded category, matching the breakdown calculation.
+  const expandedCategoryTransactions = useMemo(() => {
+    if (!expandedCategory) return [];
+    const monthFilter = selectedMonth === 'all' ? undefined : selectedMonth;
+    return transactions
+      .reduce<{ transaction: Transaction; shareInBase: number }[]>((acc, t) => {
+        if (t.type !== 'expense' || t.category !== expandedCategory) return acc;
+        if (monthFilter && !t.date.startsWith(monthFilter)) return acc;
+        const share = t.isPersonal
+          ? t.amount
+          : t.splits.find(s => s.participantId === currentUserId)?.amount ?? 0;
+        if (share <= 0) return acc;
+        acc.push({ transaction: t, shareInBase: share * t.rate });
+        return acc;
+      }, [])
+      .sort((a, b) => b.transaction.date.localeCompare(a.transaction.date));
+  }, [transactions, expandedCategory, selectedMonth, currentUserId]);
+
+  const getParticipantName = (id: string) => {
+    return participants.find(p => p.id === id)?.name || 'Unknown';
+  };
 
   return (
     <div className="space-y-6">
@@ -255,9 +286,16 @@ export default function DashboardTab({
               {sortedCategories.map(cat => {
                 const config = CATEGORY_CONFIG[cat.category] || CATEGORY_CONFIG['Others'];
                 const Icon = config.icon;
+                const isExpanded = expandedCategory === cat.category;
+                const catTransactions = isExpanded ? expandedCategoryTransactions : [];
                 return (
                   <div key={cat.category} className="space-y-2 group">
-                    <div className="flex items-center justify-between text-sm">
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(cat.category)}
+                      aria-expanded={isExpanded}
+                      className="w-full flex items-center justify-between text-sm text-left cursor-pointer rounded-xl px-1 -mx-1 py-0.5 hover:bg-slate-50/60 transition-colors"
+                    >
                       <div className="flex items-center gap-2.5">
                         <div className={`p-2 rounded-xl ${config.color} bg-white border border-slate-100 shadow-sm transition-transform group-hover:scale-105`}>
                           <Icon className="w-4 h-4" />
@@ -267,17 +305,81 @@ export default function DashboardTab({
                           {cat.percentage.toFixed(1)}%
                         </span>
                       </div>
-                      <span className="font-bold text-slate-800">
-                        {baseCurrencySymbol}
-                        {cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800">
+                          {baseCurrencySymbol}
+                          {cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
 
                     <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
                       <div
                         className={`${config.bgColor} h-full rounded-full transition-all duration-1000 ease-out`}
                         style={{ width: `${cat.percentage}%` }}
                       />
+                    </div>
+
+                    {/* Expandable transaction detail (dropdown panel) */}
+                    <div className={`grid transition-all duration-300 ease-in-out ${
+                      isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                    }`}>
+                      <div className="overflow-hidden min-h-0">
+                        <div className="mt-2 rounded-xl bg-slate-50/80 border border-slate-100 p-3 space-y-2">
+                          {catTransactions.length === 0 ? (
+                            <p className="text-xs text-slate-400 font-semibold text-center py-2">
+                              No transactions in this period.
+                            </p>
+                          ) : (
+                            <>
+                              {catTransactions.map(item => {
+                                const t = item.transaction;
+                                const isGroupSplit = !t.isPersonal;
+                                return (
+                                  <div
+                                    key={t.id}
+                                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white border border-slate-100 hover:shadow-sm transition-all duration-300"
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className={`p-1.5 rounded-lg bg-white border border-slate-100 shadow-sm ${config.color} shrink-0`}>
+                                        <Icon className="w-3.5 h-3.5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-bold text-slate-700 truncate">{t.description}</p>
+                                        <p className="text-[10px] text-slate-400 font-medium">
+                                          {t.date} · {isGroupSplit
+                                            ? `Group split · Paid by ${t.paidBy === currentUserId ? 'You' : getParticipantName(t.paidBy)}`
+                                            : 'Personal expense'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-xs font-bold text-rose-500">
+                                        -{baseCurrencySymbol}
+                                        {item.shareInBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </p>
+                                      {isGroupSplit && (
+                                        <p className="text-[10px] text-slate-400 font-medium">your share</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              <div className="flex items-center justify-between border-t border-slate-200/60 pt-2 px-1">
+                                <span className="text-[11px] font-bold text-slate-400">
+                                  {catTransactions.length} {catTransactions.length === 1 ? 'transaction' : 'transactions'}
+                                </span>
+                                <span className="text-[11px] font-bold text-slate-600">
+                                  Total: {baseCurrencySymbol}
+                                  {cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
