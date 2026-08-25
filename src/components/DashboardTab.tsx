@@ -93,7 +93,12 @@ export default function DashboardTab({
         amount: val || 0,
         percentage: totalExpenseSum > 0 ? ((val || 0) / totalExpenseSum) * 100 : 0,
       }))
-      .sort((a, b) => b.amount - a.amount);
+      .sort((a, b) => {
+        // Pin "Others" to the bottom regardless of amount; sort the rest by amount descending
+        if (a.category === 'Others') return 1;
+        if (b.category === 'Others') return -1;
+        return b.amount - a.amount;
+      });
   }, [stats.categoryBreakdown, totalExpenseSum]);
 
   // Currently expanded category in the breakdown accordion (null = all collapsed)
