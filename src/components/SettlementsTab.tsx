@@ -161,7 +161,6 @@ export default function SettlementsTab({
                   settlementsReceived: 0,
                   net: 0,
                 };
-                const hasSettlements = b.settlementsSent > 0 || b.settlementsReceived > 0;
                 return (
                   <div key={p.id} className="py-4 flex items-center justify-between gap-4 group">
                     <div className="space-y-0.5">
@@ -171,13 +170,6 @@ export default function SettlementsTab({
                         <span>•</span>
                         <span>Owed share: {baseCurrencySymbol}{b.owed.toFixed(2)}</span>
                       </div>
-                      {hasSettlements && (
-                        <div className="text-[11px] text-indigo-500 font-semibold flex items-center gap-3">
-                          <span>Repayments sent: {baseCurrencySymbol}{b.settlementsSent.toFixed(2)}</span>
-                          <span>•</span>
-                          <span>Received: {baseCurrencySymbol}{b.settlementsReceived.toFixed(2)}</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="text-right">
