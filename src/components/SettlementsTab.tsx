@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Users, ArrowRight, Share2, ArrowRightLeft } from 'lucide-react';
 import type { Debt, Participant, Transaction } from '../types';
-import { generateSettlementText, getSettlementParties, settlementPairKey, summarizeSettlementPayments } from '../utils/finance';
+import { generateSettlementText, getSettlementParties } from '../utils/finance';
 import type { SettlePreset } from './SettleModal';
 
 interface SettlementsTabProps {
@@ -91,9 +91,6 @@ export default function SettlementsTab({
 
     return balances;
   }, [transactions, participants]);
-
-  // How much each directed pair has already repaid (partial payments included).
-  const payments = useMemo(() => summarizeSettlementPayments(transactions), [transactions]);
 
   const handleCopy = () => {
     const text = generateSettlementText(simplifiedDebts, participants, baseCurrencySymbol);
@@ -224,7 +221,6 @@ export default function SettlementsTab({
                 {simplifiedDebts.map((d, idx) => {
                   const fromName = getParticipantName(d.from);
                   const toName = getParticipantName(d.to);
-                  const paid = payments[settlementPairKey(d.from, d.to)];
                   return (
                     <div
                       key={`${d.from}-${d.to}-${idx}`}
@@ -246,11 +242,6 @@ export default function SettlementsTab({
                           <span className="text-base font-black text-amber-600">
                             {baseCurrencySymbol}{d.amount.toFixed(2)}
                           </span>
-                          {paid && (
-                            <span className="text-[10px] text-slate-400 font-semibold text-right">
-                              already paid {baseCurrencySymbol}{paid.amount.toFixed(2)} ({paid.count})
-                            </span>
-                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
