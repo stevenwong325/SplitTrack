@@ -394,32 +394,32 @@ export default function DashboardTab({
         </div>
 
         {/* Mini statistics card / helper panel (Right 1/3) */}
-        <div className="glass-card p-6 rounded-2xl flex flex-col justify-between space-y-6 bg-indigo-900 text-white border-none shadow-indigo-100 shadow-lg">
+        <div className="glass-card p-6 rounded-2xl flex flex-col justify-between space-y-6 shadow-lg shadow-indigo-100">
           <div className="space-y-4">
-            <h3 className="text-lg font-bold">✨ Spending Insights</h3>
-            <p className="text-sm text-indigo-100 leading-relaxed">
-              Based on your records for <strong>{selectedMonth === 'all' ? 'All Time' : selectedMonth}</strong>, your primary expense category is <strong>{sortedCategories[0]?.category || 'None'}</strong>.
+            <h3 className="text-lg font-bold text-slate-800">✨ Spending Insights</h3>
+            <p className="text-sm text-slate-500 leading-relaxed">
+              Based on your records for <strong className="text-slate-700">{selectedMonth === 'all' ? 'All Time' : selectedMonth}</strong>, your primary expense category is <strong className="text-slate-700">{sortedCategories[0]?.category || 'None'}</strong>.
             </p>
             
             {totalExpenseSum > 0 && (
               <div className="space-y-3 pt-2">
-                <div className="flex justify-between text-xs text-indigo-200 font-semibold uppercase">
+                <div className="flex justify-between text-xs text-slate-400 font-semibold uppercase">
                   <span>Saving Ratio</span>
-                  <span>
+                  <span className="text-slate-700">
                     {stats.totalIncome > 0 
                       ? `${((stats.netBalance / stats.totalIncome) * 100).toFixed(0)}%`
                       : '0%'}
                   </span>
                 </div>
-                <div className="w-full bg-indigo-950/60 h-2.5 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div 
-                    className="bg-emerald-400 h-full rounded-full transition-all duration-1000"
+                    className="bg-emerald-500 h-full rounded-full transition-all duration-1000"
                     style={{ 
                       width: `${stats.totalIncome > 0 ? Math.max(0, Math.min(100, (stats.netBalance / stats.totalIncome) * 100)) : 0}%` 
                     }}
                   />
                 </div>
-                <p className="text-[11px] text-indigo-200">
+                <p className="text-[11px] text-slate-400">
                   {stats.netBalance > 0 
                     ? "Great job! You're saving money this month." 
                     : "You're spending more than your income this month. Keep an eye out!"}
@@ -428,9 +428,9 @@ export default function DashboardTab({
             )}
           </div>
 
-          <div className="p-4 rounded-xl bg-white/10 border border-white/15 space-y-2">
-            <h4 className="text-xs font-bold text-indigo-200 uppercase tracking-wider">🚀 Quick Split Tip</h4>
-            <p className="text-xs text-indigo-100">
+          <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-2">
+            <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider">🚀 Quick Split Tip</h4>
+            <p className="text-xs text-slate-600 leading-relaxed">
               When traveling in groups, toggle "Group Split" when adding any common bill. SplitTrack will automatically compute optimal debts so you don't have to keep doing manual math transfers!
             </p>
           </div>
