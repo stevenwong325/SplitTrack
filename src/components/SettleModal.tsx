@@ -4,9 +4,7 @@ import type { Currency, Participant, Transaction } from '../types';
 import {
   calculateSettlements,
   findDebtBetween,
-  settlementPairKey,
   simulateSettlement,
-  summarizeSettlementPayments,
 } from '../utils/finance';
 import type { SettlementDraft } from '../utils/finance';
 
@@ -49,8 +47,6 @@ export default function SettleModal({
     [transactions, participants]
   );
 
-  const payments = useMemo(() => summarizeSettlementPayments(transactions), [transactions]);
-
   const presetDebt = preset ? findDebtBetween(debts, preset.from, preset.to) : undefined;
   const fullPrefill = preset?.mode === 'full' && presetDebt ? presetDebt.amount.toFixed(2) : '';
 
@@ -79,7 +75,6 @@ export default function SettleModal({
 
   const pairDebt = findDebtBetween(debts, from, to);
   const reversePairDebt = findDebtBetween(debts, to, from);
-  const alreadyPaid = from !== to ? payments[settlementPairKey(from, to)] : undefined;
   const fullAmount = pairDebt?.amount ?? 0;
 
   // Live preview: runs the exact same maths the app renders with.
@@ -185,8 +180,8 @@ export default function SettleModal({
             </div>
           )}
 
-          {/* Current position of this pair */}
-          {(pairDebt || reversePairDebt || alreadyPaid) && (
+          {/* Outstanding amount for this pair (only what is still unpaid) */}
+          {(pairDebt || reversePairDebt) && (
             <div className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 space-y-1">
               {pairDebt && (
                 <p className="text-xs text-slate-600 font-semibold">
@@ -199,12 +194,6 @@ export default function SettleModal({
                   Outstanding now: {nameOf(to)} owes {nameOf(from)}{' '}
                   <span className="text-emerald-600">{baseCurrencySymbol}{reversePairDebt.amount.toFixed(2)}</span>
                   <span className="text-slate-400 font-medium"> — settling it from the other side works too.</span>
-                </p>
-              )}
-              {alreadyPaid && (
-                <p className="text-[11px] text-slate-400 font-semibold">
-                  Already paid by {nameOf(from)} to {nameOf(to)}: {baseCurrencySymbol}{alreadyPaid.amount.toFixed(2)}
-                  {' '}({alreadyPaid.count} payment{alreadyPaid.count === 1 ? '' : 's'}, last {alreadyPaid.lastDate})
                 </p>
               )}
             </div>
