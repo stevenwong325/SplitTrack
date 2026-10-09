@@ -225,56 +225,6 @@ export function generateSettlementText(
 /*                    Partial settlements & member transfers                   */
 /* -------------------------------------------------------------------------- */
 
-export function settlementPairKey(from: string, to: string): string {
-  return `${from}->${to}`;
-}
-
-export interface SettlementPaymentSummary {
-  key: string;
-  from: string;
-  to: string;
-  amount: number; // Total already paid between this directed pair, in Base Currency
-  count: number;
-  lastDate: string;
-}
-
-/**
- * Aggregates every recorded repayment per directed pair (A → B), so the UI can
- * show "already repaid" history next to an outstanding balance.
- */
-export function summarizeSettlementPayments(
-  transactions: Transaction[]
-): Record<string, SettlementPaymentSummary> {
-  const summary: Record<string, SettlementPaymentSummary> = {};
-
-  transactions.forEach(t => {
-    if (t.type !== 'settlement') return;
-    const parties = getSettlementParties(t);
-    if (!parties) return;
-
-    const key = settlementPairKey(parties.from, parties.to);
-    const amountInBase = t.amount * t.rate;
-    const existing = summary[key];
-
-    if (existing) {
-      existing.amount = Number((existing.amount + amountInBase).toFixed(2));
-      existing.count += 1;
-      if (t.date > existing.lastDate) existing.lastDate = t.date;
-    } else {
-      summary[key] = {
-        key,
-        from: parties.from,
-        to: parties.to,
-        amount: Number(amountInBase.toFixed(2)),
-        count: 1,
-        lastDate: t.date,
-      };
-    }
-  });
-
-  return summary;
-}
-
 /**
  * A repayment (or a plain transfer) between two members. Amounts may be typed
  * in any currency, exactly like a regular transaction.

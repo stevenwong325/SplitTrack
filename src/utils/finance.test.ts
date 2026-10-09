@@ -7,7 +7,6 @@ import {
   findDebtBetween,
   getSettlementParties,
   simulateSettlement,
-  summarizeSettlementPayments,
 } from './finance';
 import type { SettlementDraft } from './finance';
 
@@ -133,19 +132,6 @@ describe('partial settlements and transfers', () => {
     const debts = calculateSettlements([bill, settlement('friend', 'me', 130)], participants);
 
     expect(debts).toEqual([{ from: 'me', to: 'friend', amount: 30 }]);
-  });
-
-  it('summarizes how much each directed pair has already repaid', () => {
-    const summary = summarizeSettlementPayments([
-      settlement('friend', 'me', 20),
-      settlement('friend', 'me', 30),
-      { ...settlement('me', 'friend', 5), id: 'reverse' },
-      { ...groupExpense(), id: 'ignored-expense' },
-    ]);
-
-    expect(summary['friend->me']).toMatchObject({ from: 'friend', to: 'me', amount: 50, count: 2 });
-    expect(summary['me->friend']).toMatchObject({ from: 'me', to: 'friend', amount: 5, count: 1 });
-    expect(Object.keys(summary)).toHaveLength(2);
   });
 
   it('builds a partial settlement record that keeps the ledger consistent', () => {
