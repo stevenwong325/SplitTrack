@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Users, ArrowRight, Share2, ArrowRightLeft, Trash2, History } from 'lucide-react';
+import { Check, Users, ArrowRight, Share2, ArrowRightLeft } from 'lucide-react';
 import type { Debt, Participant, Transaction } from '../types';
 import { generateSettlementText, getSettlementParties, settlementPairKey, summarizeSettlementPayments } from '../utils/finance';
 import type { SettlePreset } from './SettleModal';
@@ -9,10 +9,8 @@ interface SettlementsTabProps {
   transactions: Transaction[];
   simplifiedDebts: Debt[];
   baseCurrencySymbol: string;
-  baseCurrencyCode: string;
   onOpenSettle: (preset: SettlePreset) => void;
   onOpenTransfer: () => void;
-  onDeleteSettlement: (id: string) => void;
 }
 
 export default function SettlementsTab({
@@ -20,13 +18,10 @@ export default function SettlementsTab({
   transactions,
   simplifiedDebts,
   baseCurrencySymbol,
-  baseCurrencyCode,
   onOpenSettle,
   onOpenTransfer,
-  onDeleteSettlement,
 }: SettlementsTabProps) {
   const [copied, setCopied] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const getParticipantName = (id: string) => {
     return participants.find(p => p.id === id)?.name || 'Unknown';
@@ -99,15 +94,6 @@ export default function SettlementsTab({
 
   // How much each directed pair has already repaid (partial payments included).
   const payments = useMemo(() => summarizeSettlementPayments(transactions), [transactions]);
-
-  // Newest payments first; equal dates keep the ledger's newest-first order.
-  const recentPayments = useMemo(
-    () => transactions
-      .filter(t => t.type === 'settlement')
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 10),
-    [transactions]
-  );
 
   const handleCopy = () => {
     const text = generateSettlementText(simplifiedDebts, participants, baseCurrencySymbol);
@@ -284,9 +270,9 @@ export default function SettlementsTab({
                           </button>
                           <button
                             onClick={() => onOpenSettle({ from: d.from, to: d.to, mode: 'partial' })}
-                            className="px-2.5 py-1.5 text-[10px] border border-white/20 text-slate-200 hover:bg-white/10 font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
+                            className="px-2.5 py-1.5 text-[10px] font-bold rounded-lg bg-white text-slate-800 hover:bg-slate-100 shadow-lg active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                           >
-                            Partial…
+                            Pay partial…
                           </button>
                         </div>
                       </div>
@@ -299,7 +285,7 @@ export default function SettlementsTab({
             {simplifiedDebts.length > 0 && (
               <div className="border-t border-white/10 pt-4 mt-auto">
                 <p className="text-[10px] text-slate-400 leading-relaxed text-center">
-                  💡 <strong>Tip:</strong> Pick “Partial…” to pay only part of a debt — the record is kept and the
+                  💡 <strong>Tip:</strong> Pick “Pay partial…” to pay only part of a debt — the record is kept and the
                   optimised list recalculates the remaining steps for the whole group.
                 </p>
               </div>
@@ -308,88 +294,6 @@ export default function SettlementsTab({
         </div>
 
       </div>
-
-      {/* Payment History */}
-      {recentPayments.length > 0 && (
-        <div className="glass-card p-6 rounded-2xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-5 h-5 text-indigo-500" /> Recorded Payments
-            </h3>
-            <span className="text-xs text-slate-400 font-semibold">
-              Latest {recentPayments.length} of {transactions.filter(t => t.type === 'settlement').length}
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {recentPayments.map(t => {
-              const parties = getSettlementParties(t);
-              const isPending = pendingDeleteId === t.id;
-
-              return (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 bg-white/50 hover:bg-white/80 transition-colors"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                      <span className="truncate">{parties ? getParticipantName(parties.from) : 'Unknown'}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{parties ? getParticipantName(parties.to) : 'Unknown'}</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 font-semibold flex items-center gap-2 flex-wrap">
-                      <span>{t.date}</span>
-                      {t.note && <span className="text-indigo-500">📝 {t.note}</span>}
-                      {t.currency !== baseCurrencyCode && (
-                        <span>{t.currency} {t.amount.toFixed(2)}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-black text-indigo-600">
-                      {baseCurrencySymbol}{(t.amount * t.rate).toFixed(2)}
-                    </span>
-
-                    {isPending ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            onDeleteSettlement(t.id);
-                            setPendingDeleteId(null);
-                          }}
-                          className="px-2 py-1 text-[10px] font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => setPendingDeleteId(null)}
-                          className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all cursor-pointer"
-                        >
-                          Keep
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setPendingDeleteId(t.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Delete this payment"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            Deleting a payment re-opens the debt it had settled. Everything else — expenses, dashboard totals and
-            personal stats — are unaffected by repayments.
-          </p>
-        </div>
-      )}
 
     </div>
   );

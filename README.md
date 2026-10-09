@@ -19,8 +19,8 @@ When adding an expense, easily toggle between:
 
 ### 3. Debt Simplification Algorithm
 Includes an optimized greedy ledger settlement matching algorithm ($O(N \log N)$ complexity). It simplifies net balances across the group, calculating "who owes whom" in the minimum possible transactions.
-*   **Full, Partial or Transfer:** Every optimized debt offers **"Pay \<amount\>"** (settle it in full) and **"Partial…"** (pay only a part of it), plus a **"Record Transfer"** action for a payment between any two members. Each payment is an ordinary ledger record, so the balance sheet, dashboard and optimized matrix recalculate instantly.
-*   **Live Preview & Safety:** The payment dialog previews the resulting debts (step count, remaining balance for that pair) before you confirm, warns when a payment exceeds the outstanding amount, and stores an optional note per payment. Recorded payments are listed with a two-step inline delete — no native browser dialogs.
+*   **Full, Partial or Transfer:** Every optimized debt offers **"Pay \<amount\>"** (settle it in full) and **"Pay partial…"** (pay only a part of it), plus a **"Record Transfer"** action for a payment between any two members. Each payment is an ordinary ledger record, so the balance sheet, dashboard and optimized matrix recalculate instantly.
+*   **Live Preview & Safety:** The payment dialog previews the resulting debts (step count, remaining balance for that pair) before you confirm, warns when a payment exceeds the outstanding amount, and stores an optional note per payment. Recorded payments appear in the Transactions ledger (filter: "🤝 Settlements"), where they can also be deleted.
 
 ### 4. Multi-Currency Engine & Custom Presets
 *   **Dynamic Currency Manager:** Easily add custom currencies or load popular presets (including `USD`, `EUR`, `GBP`, `SGD`, `AUD`, `KRW`, `JPY`, `CNY`, and `TWD`) directly in the Settings tab.

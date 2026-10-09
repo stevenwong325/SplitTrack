@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@layer utilities {
+@layer base {
   .glass {
     background: rgba(255, 255, 255, 0.45);
     backdrop-filter: blur(12px);
@@ -15,6 +15,8 @@
     border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
+  /* Kept in the base layer so Tailwind utilities such as `bg-slate-900` or
+     `shadow-2xl` still win when a card needs a solid (non-glass) surface. */
   .glass-card {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(16px);

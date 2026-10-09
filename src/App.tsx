@@ -200,14 +200,9 @@ export default function App() {
             <button
               onClick={() => setIsRemarkModalOpen(true)}
               title="Note an improvement idea"
-              className="relative flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white/60 text-amber-500 hover:bg-amber-50 hover:border-amber-200 transition-all cursor-pointer"
+              className="flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white/60 text-amber-500 hover:bg-amber-50 hover:border-amber-200 transition-all cursor-pointer"
             >
               <Lightbulb className="w-4 h-4" />
-              {openRemarkCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">
-                  {openRemarkCount}
-                </span>
-              )}
             </button>
 
             {/* Quick Currency display status */}
@@ -254,10 +249,8 @@ export default function App() {
               transactions={transactions}
               simplifiedDebts={simplifiedDebts}
               baseCurrencySymbol={baseCurrency.symbol}
-              baseCurrencyCode={baseCurrencyCode}
               onOpenSettle={handleOpenSettle}
               onOpenTransfer={handleOpenTransfer}
-              onDeleteSettlement={deleteTransaction}
             />
           )}
 
