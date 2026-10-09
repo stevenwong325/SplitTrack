@@ -5,15 +5,21 @@ import {
   Users, 
   Settings as SettingsIcon, 
   Plus, 
-  Coins 
+  Coins,
+  Lightbulb
 } from 'lucide-react';
 import { useAppState } from './hooks/useAppState';
-import { calculateSettlements } from './utils/finance';
+import { buildSettlementTransaction, calculateSettlements } from './utils/finance';
+import type { SettlementDraft } from './utils/finance';
+import { countOpenRemarks } from './utils/remarks';
 import DashboardTab from './components/DashboardTab';
 import TransactionsTab from './components/TransactionsTab';
 import SettlementsTab from './components/SettlementsTab';
 import SettingsTab from './components/SettingsTab';
 import AddTransactionModal from './components/AddTransactionModal';
+import SettleModal from './components/SettleModal';
+import type { SettlePreset } from './components/SettleModal';
+import QuickRemarkModal from './components/QuickRemarkModal';
 import type { Transaction } from './types';
 
 export default function App() {
@@ -38,11 +44,21 @@ export default function App() {
     clearAllData,
     loadDemoData,
     importData,
+    remarks,
+    addRemark,
+    toggleRemarkStatus,
+    updateRemarkText,
+    setRemarkTag,
+    removeRemark,
+    clearDoneRemarks,
   } = useAppState();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'settlements' | 'settings'>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+  const [settlePreset, setSettlePreset] = useState<SettlePreset | null>(null);
+  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
 
   // Dynamic default month: newest transaction month or 'all' if empty
   const latestTxMonth = useMemo(() => {
@@ -70,29 +86,22 @@ export default function App() {
     return calculateSettlements(transactions, participants);
   }, [transactions, participants]);
 
-  // Handle Recording of Debt Settlement
-  const handleRecordSettlement = (fromId: string, toId: string, amount: number) => {
-    const fromName = participants.find(p => p.id === fromId)?.name || 'Someone';
-    const toName = participants.find(p => p.id === toId)?.name || 'Someone';
-
-    addTransaction({
-      description: `🤝 Settle: ${fromName} paid ${toName}`,
-      amount,
-      currency: baseCurrencyCode,
-      rate: 1.0,
-      date: new Date().toISOString().split('T')[0], // Today
-      category: 'Others',
-      type: 'settlement',
-      paidBy: fromId,
-      isPersonal: false,
-      splitMode: 'custom',
-      splits: [
-        { participantId: toId, amount },
-      ],
-      settlementFrom: fromId,
-      settlementTo: toId,
-    });
+  // Handle Recording of Debt Settlement (full, partial or a free transfer)
+  const handleRecordSettlement = (draft: SettlementDraft) => {
+    addTransaction(buildSettlementTransaction(draft, participants));
   };
+
+  const handleOpenSettle = (preset: SettlePreset) => {
+    setSettlePreset(preset);
+    setIsSettleModalOpen(true);
+  };
+
+  const handleOpenTransfer = () => {
+    setSettlePreset(null);
+    setIsSettleModalOpen(true);
+  };
+
+  const openRemarkCount = useMemo(() => countOpenRemarks(remarks), [remarks]);
 
   const handleEditClick = (t: Transaction) => {
     setEditingTransaction(t);
@@ -111,8 +120,9 @@ export default function App() {
       currencies,
       transactions,
       baseCurrencyCode,
+      remarks,
     }, null, 2);
-  }, [participants, currencies, transactions, baseCurrencyCode]);
+  }, [participants, currencies, transactions, baseCurrencyCode, remarks]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-20 md:pb-0">
@@ -186,6 +196,20 @@ export default function App() {
               <Plus className="w-4 h-4" /> Record Bill
             </button>
 
+            {/* Quick improvement note (available from every tab) */}
+            <button
+              onClick={() => setIsRemarkModalOpen(true)}
+              title="Note an improvement idea"
+              className="relative flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200 bg-white/60 text-amber-500 hover:bg-amber-50 hover:border-amber-200 transition-all cursor-pointer"
+            >
+              <Lightbulb className="w-4 h-4" />
+              {openRemarkCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">
+                  {openRemarkCount}
+                </span>
+              )}
+            </button>
+
             {/* Quick Currency display status */}
             <div className="px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200/50 flex items-center gap-1 text-[11px] font-black text-slate-500 uppercase tracking-wide">
               <Coins className="w-3.5 h-3.5 text-indigo-500" /> {baseCurrencyCode} ({baseCurrency.symbol})
@@ -230,7 +254,10 @@ export default function App() {
               transactions={transactions}
               simplifiedDebts={simplifiedDebts}
               baseCurrencySymbol={baseCurrency.symbol}
-              onRecordSettlement={handleRecordSettlement}
+              baseCurrencyCode={baseCurrencyCode}
+              onOpenSettle={handleOpenSettle}
+              onOpenTransfer={handleOpenTransfer}
+              onDeleteSettlement={deleteTransaction}
             />
           )}
 
@@ -252,6 +279,13 @@ export default function App() {
               onLoadDemoData={loadDemoData}
               onImportData={importData}
               exportDataJson={exportDataJson}
+              remarks={remarks}
+              onAddRemark={addRemark}
+              onToggleRemark={toggleRemarkStatus}
+              onUpdateRemarkText={updateRemarkText}
+              onSetRemarkTag={setRemarkTag}
+              onRemoveRemark={removeRemark}
+              onClearDoneRemarks={clearDoneRemarks}
             />
           )}
         </div>
@@ -320,6 +354,31 @@ export default function App() {
         editingTransaction={editingTransaction}
         onUpdate={updateTransaction}
       />
+
+      {/* Settlement / Transfer Modal Overlay — keyed so every opening starts fresh */}
+      {isSettleModalOpen && (
+        <SettleModal
+          key={settlePreset ? `${settlePreset.from}-${settlePreset.to}-${settlePreset.mode}` : 'transfer'}
+          onClose={() => setIsSettleModalOpen(false)}
+          participants={participants}
+          transactions={transactions}
+          currencies={currencies}
+          baseCurrencyCode={baseCurrencyCode}
+          baseCurrencySymbol={baseCurrency.symbol}
+          currentUserId={currentUserId}
+          preset={settlePreset}
+          onConfirm={handleRecordSettlement}
+        />
+      )}
+
+      {/* Quick Improvement Note Modal */}
+      {isRemarkModalOpen && (
+        <QuickRemarkModal
+          onClose={() => setIsRemarkModalOpen(false)}
+          onSubmit={addRemark}
+          openCount={openRemarkCount}
+        />
+      )}
 
     </div>
   );

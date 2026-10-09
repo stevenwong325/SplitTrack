@@ -42,6 +42,7 @@ export interface Transaction {
   splits: SplitShare[]; // Array of shares
   settlementFrom?: string; // Participant ID who sends a settlement payment
   settlementTo?: string; // Participant ID who receives a settlement payment
+  note?: string; // Optional free text attached to a settlement payment (e.g. "paid the rest in cash")
 }
 
 export interface Debt {
@@ -55,4 +56,30 @@ export interface AppState {
   currencies: Currency[];
   transactions: Transaction[];
   baseCurrencyCode: string;
+}
+
+/** Category used to group in-app improvement notes. */
+export type RemarkTag = 'Bug' | 'UX' | 'Feature' | 'Idea';
+
+export type RemarkStatus = 'open' | 'done';
+
+/**
+ * A personal note about what could still be improved in the app. Remarks are
+ * stored outside of the ledger (separate storage key) so that resetting or
+ * demo-loading the ledger never destroys them.
+ */
+export interface Remark {
+  id: string;
+  text: string;
+  createdAt: string; // ISO timestamp
+  status: RemarkStatus;
+  tag?: RemarkTag;
+}
+
+/**
+ * Shape accepted by `importData`. `remarks` is optional so that backups made
+ * before the Remarks feature still import cleanly.
+ */
+export interface BackupPayload extends AppState {
+  remarks?: Remark[];
 }

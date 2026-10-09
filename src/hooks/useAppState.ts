@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Participant, Currency, Transaction, AppState } from '../types';
+import type { Participant, Currency, Transaction, AppState, BackupPayload, Remark, RemarkTag } from '../types';
 import { migrateAppState } from '../utils/migrations';
+import { createRemark, normalizeRemarkList } from '../utils/remarks';
 
 const STORAGE_KEY = 'splittrack_state';
 const CURRENT_USER_KEY = 'splittrack_current_user_id';
+// Improvement notes use their own key so that resetting or demo-loading the
+// ledger can never destroy them.
+const REMARKS_KEY = 'splittrack_remarks';
 
 const DEFAULT_CURRENCIES: Currency[] = [
   { code: 'HKD', symbol: '$', rate: 1.0, isBase: true },
@@ -57,6 +61,21 @@ export function useAppState() {
   useEffect(() => {
     localStorage.setItem(CURRENT_USER_KEY, currentUserId);
   }, [currentUserId]);
+
+  // Improvement notes (independent of the ledger, see REMARKS_KEY)
+  const [remarks, setRemarks] = useState<Remark[]>(() => {
+    try {
+      const saved = localStorage.getItem(REMARKS_KEY);
+      if (saved) return normalizeRemarkList(JSON.parse(saved));
+    } catch (e) {
+      console.error('Failed to parse SplitTrack remarks', e);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(REMARKS_KEY, JSON.stringify(remarks));
+  }, [remarks]);
 
   // Helper actions
   const addParticipant = (name: string) => {
@@ -242,6 +261,34 @@ export function useAppState() {
     return true;
   };
 
+  // Improvement note actions (Remarks)
+  const addRemark = (text: string, tag?: RemarkTag) => {
+    if (!text.trim()) return;
+    setRemarks(prev => [...prev, createRemark(text, tag)]);
+  };
+
+  const toggleRemarkStatus = (id: string) => {
+    setRemarks(prev => prev.map(r => (r.id === id ? { ...r, status: r.status === 'open' ? 'done' : 'open' } : r)));
+  };
+
+  const updateRemarkText = (id: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setRemarks(prev => prev.map(r => (r.id === id ? { ...r, text: trimmed } : r)));
+  };
+
+  const setRemarkTag = (id: string, tag?: RemarkTag) => {
+    setRemarks(prev => prev.map(r => (r.id === id ? { ...r, tag } : r)));
+  };
+
+  const removeRemark = (id: string) => {
+    setRemarks(prev => prev.filter(r => r.id !== id));
+  };
+
+  const clearDoneRemarks = () => {
+    setRemarks(prev => prev.filter(r => r.status === 'open'));
+  };
+
   const clearAllData = () => {
     if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
       setState(INITIAL_STATE);
@@ -373,11 +420,17 @@ export function useAppState() {
     setCurrentUserId('p-1');
   };
 
-  const importData = (imported: AppState) => {
+  const importData = (imported: BackupPayload) => {
     if (imported.participants && imported.currencies && imported.transactions && imported.baseCurrencyCode) {
-      setState(migrateAppState(imported));
+      const { remarks: importedRemarks, ...ledger } = imported;
+      setState(migrateAppState(ledger));
       if (imported.participants.length > 0) {
         setCurrentUserId(imported.participants[0].id);
+      }
+      // Only replace notes when the backup actually carries them, so restoring
+      // an older ledger backup never wipes the notes written since then.
+      if (Array.isArray(importedRemarks)) {
+        setRemarks(normalizeRemarkList(importedRemarks));
       }
       return true;
     }
@@ -410,5 +463,12 @@ export function useAppState() {
     clearAllData,
     loadDemoData,
     importData,
+    remarks,
+    addRemark,
+    toggleRemarkStatus,
+    updateRemarkText,
+    setRemarkTag,
+    removeRemark,
+    clearDoneRemarks,
   };
 }

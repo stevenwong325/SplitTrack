@@ -19,7 +19,8 @@ When adding an expense, easily toggle between:
 
 ### 3. Debt Simplification Algorithm
 Includes an optimized greedy ledger settlement matching algorithm ($O(N \log N)$ complexity). It simplifies net balances across the group, calculating "who owes whom" in the minimum possible transactions.
-*   **Paid & Settle:** Click "Paid & Settle" to automatically log a neutralizing transaction that instantly resolves debts in the ledger!
+*   **Full, Partial or Transfer:** Every optimized debt offers **"Pay \<amount\>"** (settle it in full) and **"Partial…"** (pay only a part of it), plus a **"Record Transfer"** action for a payment between any two members. Each payment is an ordinary ledger record, so the balance sheet, dashboard and optimized matrix recalculate instantly.
+*   **Live Preview & Safety:** The payment dialog previews the resulting debts (step count, remaining balance for that pair) before you confirm, warns when a payment exceeds the outstanding amount, and stores an optional note per payment. Recorded payments are listed with a two-step inline delete — no native browser dialogs.
 
 ### 4. Multi-Currency Engine & Custom Presets
 *   **Dynamic Currency Manager:** Easily add custom currencies or load popular presets (including `USD`, `EUR`, `GBP`, `SGD`, `AUD`, `KRW`, `JPY`, `CNY`, and `TWD`) directly in the Settings tab.
@@ -34,6 +35,11 @@ Includes an optimized greedy ledger settlement matching algorithm ($O(N \log N)$
 ### 6. Data Migration & Clipboard Share
 *   **Share Settlements:** Copy fully formatted settlement summaries with one click (with custom Markdown bold and emojis) for immediate sharing on WhatsApp or LINE.
 *   **Backup & Sync:** Import and export your complete app state as JSON backups in Settings.
+
+### 7. In-App Improvement Notes (Remarks)
+*   **Capture Anywhere:** Tap the 💡 button in the header on any tab, or use the panel in Settings, to note down what the app should still do better. Notes can carry an optional tag (Bug / UX / Feature / Idea).
+*   **Manage & Share:** Filter by All / Open / Done, search, edit inline, tick items off, clear the finished ones, or copy every note as a Markdown checklist for a chat or an issue tracker.
+*   **Never Lost by a Reset:** Notes are stored in their own storage slot, so clearing the ledger or loading demo data leaves them untouched, and they travel with JSON backups.
 
 ---
 

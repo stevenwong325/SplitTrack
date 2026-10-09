@@ -258,6 +258,10 @@ export default function TransactionsTab({
                                 </span>
                               </span>
                             )}
+
+                            {t.note && (
+                              <span className="text-[11px] text-indigo-500 font-semibold">📝 {t.note}</span>
+                            )}
                           </div>
                         </div>
                       </div>

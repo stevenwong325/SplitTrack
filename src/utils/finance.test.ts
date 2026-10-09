@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Participant, Transaction } from '../types';
-import { calculateSettlements, calculateUserStats } from './finance';
+import {
+  buildSettlementTransaction,
+  calculateSettlements,
+  calculateUserStats,
+  findDebtBetween,
+  getSettlementParties,
+  simulateSettlement,
+  summarizeSettlementPayments,
+} from './finance';
+import type { SettlementDraft } from './finance';
 
 const participants: Participant[] = [
   { id: 'me', name: 'You' },
@@ -102,5 +111,120 @@ describe('settlement accounting', () => {
       [bill, settlement('friend', 'me', 20)],
       participants,
     )).toEqual([{ from: 'friend', to: 'me', amount: 30 }]);
+  });
+});
+
+describe('partial settlements and transfers', () => {
+  it('accumulates two partial repayments into the remaining balance', () => {
+    const bill = groupExpense({ splits: [{ participantId: 'friend', amount: 100 }] });
+
+    const debts = calculateSettlements([
+      bill,
+      settlement('friend', 'me', 25),
+      settlement('friend', 'me', 40),
+    ], participants);
+
+    expect(debts).toEqual([{ from: 'friend', to: 'me', amount: 35 }]);
+  });
+
+  it('flips the balance when a member overpays', () => {
+    const bill = groupExpense({ splits: [{ participantId: 'friend', amount: 100 }] });
+
+    const debts = calculateSettlements([bill, settlement('friend', 'me', 130)], participants);
+
+    expect(debts).toEqual([{ from: 'me', to: 'friend', amount: 30 }]);
+  });
+
+  it('summarizes how much each directed pair has already repaid', () => {
+    const summary = summarizeSettlementPayments([
+      settlement('friend', 'me', 20),
+      settlement('friend', 'me', 30),
+      { ...settlement('me', 'friend', 5), id: 'reverse' },
+      { ...groupExpense(), id: 'ignored-expense' },
+    ]);
+
+    expect(summary['friend->me']).toMatchObject({ from: 'friend', to: 'me', amount: 50, count: 2 });
+    expect(summary['me->friend']).toMatchObject({ from: 'me', to: 'friend', amount: 5, count: 1 });
+    expect(Object.keys(summary)).toHaveLength(2);
+  });
+
+  it('builds a partial settlement record that keeps the ledger consistent', () => {
+    const draft: SettlementDraft = {
+      from: 'friend',
+      to: 'me',
+      amount: 30,
+      currency: 'HKD',
+      rate: 1,
+      date: '2026-08-20',
+      note: 'rest of the dinner',
+    };
+    const transaction = buildSettlementTransaction(draft, participants);
+
+    expect(transaction).toMatchObject({
+      type: 'settlement',
+      paidBy: 'friend',
+      settlementFrom: 'friend',
+      settlementTo: 'me',
+      amount: 30,
+      note: 'rest of the dinner',
+      splits: [{ participantId: 'me', amount: 30 }],
+    });
+    // The legacy-settlement migrator must never touch the new records.
+    expect(getSettlementParties({ ...transaction, id: 'x' })).toEqual({ from: 'friend', to: 'me' });
+  });
+
+  it('previews the remaining debts of a partial payment without mutating input', () => {
+    const transactions = [groupExpense({ splits: [{ participantId: 'friend', amount: 100 }] })];
+
+    const preview = simulateSettlement(transactions, participants, {
+      from: 'friend',
+      to: 'me',
+      amount: 40,
+      currency: 'HKD',
+      rate: 1,
+      date: '2026-08-20',
+    });
+
+    expect(preview.debts).toEqual([{ from: 'friend', to: 'me', amount: 60 }]);
+    expect(transactions).toHaveLength(1);
+    expect(calculateSettlements(transactions, participants)).toEqual([
+      { from: 'friend', to: 'me', amount: 100 },
+    ]);
+  });
+
+  it('previews a full settlement as an empty debt list', () => {
+    const transactions = [groupExpense({ splits: [{ participantId: 'friend', amount: 60 }] })];
+
+    const preview = simulateSettlement(transactions, participants, {
+      from: 'friend',
+      to: 'me',
+      amount: 60,
+      currency: 'HKD',
+      rate: 1,
+      date: '2026-08-20',
+    });
+
+    expect(preview.debts).toEqual([]);
+  });
+
+  it('supports transfers recorded in a foreign currency', () => {
+    const bill = groupExpense({ amount: 1000, currency: 'JPY', rate: 0.05, splits: [{ participantId: 'friend', amount: 1000 }] });
+
+    const preview = simulateSettlement([bill], participants, {
+      from: 'friend',
+      to: 'me',
+      amount: 400,
+      currency: 'JPY',
+      rate: 0.05,
+      date: '2026-08-20',
+    });
+
+    expect(preview.debts).toEqual([{ from: 'friend', to: 'me', amount: 30 }]);
+  });
+
+  it('finds the outstanding debt between two members', () => {
+    const debts = [{ from: 'friend', to: 'me', amount: 60 }];
+    expect(findDebtBetween(debts, 'friend', 'me')).toEqual(debts[0]);
+    expect(findDebtBetween(debts, 'me', 'friend')).toBeUndefined();
   });
 });

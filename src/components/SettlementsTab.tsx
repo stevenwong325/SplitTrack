@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Check, Users, ArrowRight, Share2 } from 'lucide-react';
+import { Check, Users, ArrowRight, Share2, ArrowRightLeft, Trash2, History } from 'lucide-react';
 import type { Debt, Participant, Transaction } from '../types';
-import { generateSettlementText, getSettlementParties } from '../utils/finance';
+import { generateSettlementText, getSettlementParties, settlementPairKey, summarizeSettlementPayments } from '../utils/finance';
+import type { SettlePreset } from './SettleModal';
 
 interface SettlementsTabProps {
   participants: Participant[];
   transactions: Transaction[];
   simplifiedDebts: Debt[];
   baseCurrencySymbol: string;
-  onRecordSettlement: (fromId: string, toId: string, amount: number) => void;
+  baseCurrencyCode: string;
+  onOpenSettle: (preset: SettlePreset) => void;
+  onOpenTransfer: () => void;
+  onDeleteSettlement: (id: string) => void;
 }
 
 export default function SettlementsTab({
@@ -16,9 +20,13 @@ export default function SettlementsTab({
   transactions,
   simplifiedDebts,
   baseCurrencySymbol,
-  onRecordSettlement,
+  baseCurrencyCode,
+  onOpenSettle,
+  onOpenTransfer,
+  onDeleteSettlement,
 }: SettlementsTabProps) {
   const [copied, setCopied] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const getParticipantName = (id: string) => {
     return participants.find(p => p.id === id)?.name || 'Unknown';
@@ -89,6 +97,18 @@ export default function SettlementsTab({
     return balances;
   }, [transactions, participants]);
 
+  // How much each directed pair has already repaid (partial payments included).
+  const payments = useMemo(() => summarizeSettlementPayments(transactions), [transactions]);
+
+  // Newest payments first; equal dates keep the ledger's newest-first order.
+  const recentPayments = useMemo(
+    () => transactions
+      .filter(t => t.type === 'settlement')
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 10),
+    [transactions]
+  );
+
   const handleCopy = () => {
     const text = generateSettlementText(simplifiedDebts, participants, baseCurrencySymbol);
     navigator.clipboard.writeText(text).then(() => {
@@ -104,25 +124,34 @@ export default function SettlementsTab({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">🤝 Group Settlement & Balances</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Optimized transaction matrix to settle debts with the fewest steps.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Pay a debt in full or in parts — balances re-optimise automatically.</p>
         </div>
 
-        {simplifiedDebts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleCopy}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/15 active:scale-95 transition-all cursor-pointer"
+            onClick={onOpenTransfer}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/70 hover:bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold shadow-sm active:scale-95 transition-all cursor-pointer"
           >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-300" /> Copied!
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4" /> Share Settlement
-              </>
-            )}
+            <ArrowRightLeft className="w-4 h-4 text-indigo-600" /> Record Transfer
           </button>
-        )}
+
+          {simplifiedDebts.length > 0 && (
+            <button
+              onClick={handleCopy}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/15 active:scale-95 transition-all cursor-pointer"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" /> Share Settlement
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -208,16 +237,19 @@ export default function SettlementsTab({
               <div className="flex-1 flex flex-col items-center justify-center py-16 text-center text-slate-400">
                 <span className="text-5xl mb-3">🎉</span>
                 <p className="font-bold text-white text-sm">Everyone is all settled up!</p>
-                <p className="text-xs mt-1 text-slate-400 leading-relaxed">No outstanding debts are remaining in this group.</p>
+                <p className="text-xs mt-1 text-slate-400 leading-relaxed">
+                  No outstanding debts are remaining in this group. Use “Record Transfer” for a standalone payment.
+                </p>
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto py-4 space-y-4 max-h-[450px] pr-1">
                 {simplifiedDebts.map((d, idx) => {
                   const fromName = getParticipantName(d.from);
                   const toName = getParticipantName(d.to);
+                  const paid = payments[settlementPairKey(d.from, d.to)];
                   return (
                     <div
-                      key={idx}
+                      key={`${d.from}-${d.to}-${idx}`}
                       className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3 hover:bg-white/10 transition-colors"
                     >
                       {/* Connection row */}
@@ -230,22 +262,33 @@ export default function SettlementsTab({
                         <div className="font-semibold text-slate-300 truncate max-w-[85px] text-right">{toName}</div>
                       </div>
 
-                      {/* Cash Row & Action Button */}
-                      <div className="flex items-center justify-between gap-4 border-t border-white/5 pt-2">
-                        <span className="text-base font-black text-amber-400">
-                          {baseCurrencySymbol}{d.amount.toFixed(2)}
-                        </span>
-                        
-                        <button
-                          onClick={() => {
-                            if (confirm(`Mark that ${fromName} paid ${toName} ${baseCurrencySymbol}${d.amount}? This will record a balancing transaction.`)) {
-                              onRecordSettlement(d.from, d.to, d.amount);
-                            }
-                          }}
-                          className="px-2.5 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-all shadow shadow-indigo-600/30 active:scale-95 cursor-pointer"
-                        >
-                          💸 Paid & Settle
-                        </button>
+                      {/* Cash Row & Action Buttons */}
+                      <div className="border-t border-white/5 pt-2 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-base font-black text-amber-400">
+                            {baseCurrencySymbol}{d.amount.toFixed(2)}
+                          </span>
+                          {paid && (
+                            <span className="text-[10px] text-slate-400 font-semibold text-right">
+                              already paid {baseCurrencySymbol}{paid.amount.toFixed(2)} ({paid.count})
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onOpenSettle({ from: d.from, to: d.to, mode: 'full' })}
+                            className="flex-1 px-2.5 py-1.5 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-all shadow shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                          >
+                            💸 Pay {baseCurrencySymbol}{d.amount.toFixed(2)}
+                          </button>
+                          <button
+                            onClick={() => onOpenSettle({ from: d.from, to: d.to, mode: 'partial' })}
+                            className="px-2.5 py-1.5 text-[10px] border border-white/20 text-slate-200 hover:bg-white/10 font-bold rounded-lg transition-all active:scale-95 cursor-pointer"
+                          >
+                            Partial…
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -256,7 +299,8 @@ export default function SettlementsTab({
             {simplifiedDebts.length > 0 && (
               <div className="border-t border-white/10 pt-4 mt-auto">
                 <p className="text-[10px] text-slate-400 leading-relaxed text-center">
-                  💡 <strong>Tip:</strong> Clicking "Paid & Settle" automatically adds a balancing transaction that resolves the exact debt between members, updating the ledger history.
+                  💡 <strong>Tip:</strong> Pick “Partial…” to pay only part of a debt — the record is kept and the
+                  optimised list recalculates the remaining steps for the whole group.
                 </p>
               </div>
             )}
@@ -264,6 +308,88 @@ export default function SettlementsTab({
         </div>
 
       </div>
+
+      {/* Payment History */}
+      {recentPayments.length > 0 && (
+        <div className="glass-card p-6 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-500" /> Recorded Payments
+            </h3>
+            <span className="text-xs text-slate-400 font-semibold">
+              Latest {recentPayments.length} of {transactions.filter(t => t.type === 'settlement').length}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {recentPayments.map(t => {
+              const parties = getSettlementParties(t);
+              const isPending = pendingDeleteId === t.id;
+
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 bg-white/50 hover:bg-white/80 transition-colors"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                      <span className="truncate">{parties ? getParticipantName(parties.from) : 'Unknown'}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{parties ? getParticipantName(parties.to) : 'Unknown'}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-semibold flex items-center gap-2 flex-wrap">
+                      <span>{t.date}</span>
+                      {t.note && <span className="text-indigo-500">📝 {t.note}</span>}
+                      {t.currency !== baseCurrencyCode && (
+                        <span>{t.currency} {t.amount.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-black text-indigo-600">
+                      {baseCurrencySymbol}{(t.amount * t.rate).toFixed(2)}
+                    </span>
+
+                    {isPending ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            onDeleteSettlement(t.id);
+                            setPendingDeleteId(null);
+                          }}
+                          className="px-2 py-1 text-[10px] font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setPendingDeleteId(null)}
+                          className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all cursor-pointer"
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setPendingDeleteId(t.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete this payment"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Deleting a payment re-opens the debt it had settled. Everything else — expenses, dashboard totals and
+            personal stats — are unaffected by repayments.
+          </p>
+        </div>
+      )}
 
     </div>
   );

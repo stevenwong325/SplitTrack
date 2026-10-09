@@ -220,3 +220,127 @@ export function generateSettlementText(
   text += '\nGenerated via SplitTrack app. Please settle up!';
   return text;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                    Partial settlements & member transfers                   */
+/* -------------------------------------------------------------------------- */
+
+export function settlementPairKey(from: string, to: string): string {
+  return `${from}->${to}`;
+}
+
+export interface SettlementPaymentSummary {
+  key: string;
+  from: string;
+  to: string;
+  amount: number; // Total already paid between this directed pair, in Base Currency
+  count: number;
+  lastDate: string;
+}
+
+/**
+ * Aggregates every recorded repayment per directed pair (A → B), so the UI can
+ * show "already repaid" history next to an outstanding balance.
+ */
+export function summarizeSettlementPayments(
+  transactions: Transaction[]
+): Record<string, SettlementPaymentSummary> {
+  const summary: Record<string, SettlementPaymentSummary> = {};
+
+  transactions.forEach(t => {
+    if (t.type !== 'settlement') return;
+    const parties = getSettlementParties(t);
+    if (!parties) return;
+
+    const key = settlementPairKey(parties.from, parties.to);
+    const amountInBase = t.amount * t.rate;
+    const existing = summary[key];
+
+    if (existing) {
+      existing.amount = Number((existing.amount + amountInBase).toFixed(2));
+      existing.count += 1;
+      if (t.date > existing.lastDate) existing.lastDate = t.date;
+    } else {
+      summary[key] = {
+        key,
+        from: parties.from,
+        to: parties.to,
+        amount: Number(amountInBase.toFixed(2)),
+        count: 1,
+        lastDate: t.date,
+      };
+    }
+  });
+
+  return summary;
+}
+
+/**
+ * A repayment (or a plain transfer) between two members. Amounts may be typed
+ * in any currency, exactly like a regular transaction.
+ */
+export interface SettlementDraft {
+  from: string;
+  to: string;
+  amount: number; // In `currency`
+  currency: string;
+  rate: number; // 1 unit of `currency` = X Base Currency
+  date: string; // YYYY-MM-DD
+  note?: string;
+}
+
+export function findDebtBetween(debts: Debt[], from: string, to: string): Debt | undefined {
+  return debts.find(d => d.from === from && d.to === to);
+}
+
+/**
+ * Builds the ledger record for a settlement payment. Partial amounts are
+ * supported natively: a smaller payment simply leaves a smaller net balance.
+ */
+export function buildSettlementTransaction(
+  draft: SettlementDraft,
+  participants: Participant[]
+): Omit<Transaction, 'id'> {
+  const getName = (id: string) => participants.find(p => p.id === id)?.name || 'Someone';
+  const note = draft.note?.trim();
+
+  const transaction: Omit<Transaction, 'id'> = {
+    description: `🤝 Settle: ${getName(draft.from)} paid ${getName(draft.to)}`,
+    amount: draft.amount,
+    currency: draft.currency,
+    rate: draft.rate,
+    date: draft.date,
+    category: 'Others',
+    type: 'settlement',
+    paidBy: draft.from,
+    isPersonal: false,
+    splitMode: 'custom',
+    splits: [{ participantId: draft.to, amount: draft.amount }],
+    settlementFrom: draft.from,
+    settlementTo: draft.to,
+  };
+  if (note) transaction.note = note;
+  return transaction;
+}
+
+/**
+ * Pure preview of what the ledger would look like after recording a payment.
+ * Reuses the very same maths the app renders with, so the preview cannot drift
+ * from the recorded result.
+ */
+export function simulateSettlement(
+  transactions: Transaction[],
+  participants: Participant[],
+  draft: SettlementDraft
+): { transaction: Omit<Transaction, 'id'>; debts: Debt[] } {
+  const transaction = buildSettlementTransaction(draft, participants);
+  const previewTransactions: Transaction[] = [
+    { ...transaction, id: 'settlement-preview' },
+    ...transactions,
+  ];
+
+  return {
+    transaction,
+    debts: calculateSettlements(previewTransactions, participants),
+  };
+}
